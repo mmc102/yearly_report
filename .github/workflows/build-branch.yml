@@ -1,0 +1,32 @@
+name: build-branch
+run-name: "Branch build #${{ github.run_number }} on PR ${{ github.event.number }}"
+on: [ pull_request ]
+jobs:
+  build:
+    strategy:
+      matrix:
+        image_name_and_folder: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-skip-session-tagging: true
+        aws-region: us-east-2
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    - name: checkout code
+      uses: actions/checkout@v4
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: finance-fullstack
+        IMAGE_NAME: ${{ matrix.image_name_and_folder }}
+        IMAGE_TAG: ${{ github.sha }}
+        VITE_API_URL: https://api.myfinancereport.com
+      working-directory: fullstack/${{ matrix.image_name_and_folder }}
+      run: |
+        ./build.sh
