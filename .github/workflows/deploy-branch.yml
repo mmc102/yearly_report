@@ -1,0 +1,20 @@
+name: deploy-branch
+run-name: "Branch deploy #${{ github.run_number }} on PR ${{ github.event.number }}"
+on: [ pull_request ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4
+    - name: Deploy to EC2
+      env:
+        PRIVATE_KEY: ${{ secrets.FINANCE_KEY }}
+        HOST: ${{ secrets.EC2_TEST_HOST }}
+        USER: ${{ secrets.EC2_USER }}
+        REMOTE_DIR: "/home/ec2-user/code/finance_app"
+      run: |
+        echo "$PRIVATE_KEY" > github-ec2.pem && chmod 600 github-ec2.pem
+        ssh -o StrictHostKeyChecking=no -i github-ec2.pem ${USER}@${HOST} '
+        rsync -avz docker-compose.prod.yml ${REMOTE_SERVER}:${REMOTE_DIR}/
+        rsync -avz bin/backup_db ${REMOTE_SERVER}:${REMOTE_DIR}/
