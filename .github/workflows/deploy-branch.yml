@@ -1,0 +1,68 @@
+name: deploy-branch
+run-name: "Branch deploy #${{ github.run_number }} on PR ${{ github.event.number }}"
+on: [ pull_request ]
+jobs:
+  make-env-file:
+    runs-on: ubuntu-latest
+    steps:
+    - name: setup AWS creds
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-skip-session-tagging: true
+        aws-region: us-east-2
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+    - name: Grab Secrets
+      uses: aws-actions/aws-secretsmanager-get-secrets@v2
+      with:
+        # get all secrets for the myFinance app.. a little brittle but makes adding new secrets easy
+        secret-ids: |
+          myFinance/*
+        name-transformation: uppercase
+        parse-json-secrets: false
+    - name: checkout code
+      uses: actions/checkout@v4
+    - name: populate template file
+      id: populate_template
+      uses: pedrolamas/handlebars-action@v2
+      env:
+        ENV: dev
+      with:
+        files: 'templates/.env.template'
+        output-filename: 'templates/.env.production'
+        html-escape: false
+        dry-run: false
+    - name: upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: .env.production
+        include-hidden-files: true
+        path: templates/.env.production
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [make-env-file]
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4
+    - name: download env file
+      uses: actions/download-artifact@v4
+      with:
+        name: .env.production
+    - name: Deploy to EC2
+      env:
+        PRIVATE_KEY: ${{ secrets.FINANCE_KEY }}
+        HOST: ec2-52-15-193-109.us-east-2.compute.amazonaws.com
+        USER: ${{ secrets.EC2_USER }}
+        REMOTE_DIR: "/home/ec2-user/code/finance_app"
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "${PRIVATE_KEY}" > private_key.pem
+        ssh -i "private_key.pem" ${USER}@${HOST} 'mkdir -p code/finance_app'
+        rsync -avz .env.production ${HOST}:${REMOTE_DIR}
+        ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} '
+        aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin "067448242226.dkr.ecr.us-east-2.amazonaws.com"
+        docker-compose --env-file .env.production -f docker-compose.prod.yml pull
+        docker-compose --env-file .env.production.runtime -f docker-compose.prod.yml up -d
+        chmod +x /home/ec2-user/code/finance_app/backup_db
+        '

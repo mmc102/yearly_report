@@ -21,7 +21,7 @@ services:
     command: ["postgres"]
 
   backend:
-    image: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/finance-fullstack/backend:latest"
+    image: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/finance-fullstack/backend:${IMAGE_TAG}"
     restart: always
     depends_on:
       db:
@@ -54,7 +54,7 @@ services:
 
 
   frontend:
-    image: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/finance-fullstack/frontend:latest"
+    image: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/finance-fullstack/frontend:${IMAGE_TAG}"
     restart: always
     depends_on:
       - backend

@@ -7,41 +7,6 @@ permissions:
   id-token: write
   contents: read 
 jobs:
-  make-env-file:
-    runs-on: ubuntu-latest
-    steps:
-    - name: setup AWS creds
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-skip-session-tagging: true
-        aws-region: us-east-2
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-    - name: Grab Secrets
-      uses: aws-actions/aws-secretsmanager-get-secrets@v2
-      with:
-        # get all secrets for the myFinance app.. a little brittle but makes adding new secrets easy
-        secret-ids: |
-          myFinance/*
-        name-transformation: uppercase
-        parse-json-secrets: false
-    - name: checkout code
-      uses: actions/checkout@v4
-    - name: populate template file
-      id: populate_template
-      uses: pedrolamas/handlebars-action@v2
-      env:
-        ENV: dev
-      with:
-        files: 'templates/.env.template'
-        output-filename: 'templates/env_filled_in'
-        html-escape: false
-        dry-run: false
-    - name: upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: .env.production
-        path: templates/env_filled_in
   push-ecr:
     strategy:
       matrix:
